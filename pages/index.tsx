@@ -9,7 +9,7 @@ const PROGOL_CONFIG = {
   DISTRIBUCION_HISTORICA: { L: 0.38, E: 0.29, V: 0.33 },
   RANGOS_HISTORICOS: {
     L: [0.35, 0.41],
-    E: [0.25, 0.33], 
+    E: [0.25, 0.33],
     V: [0.30, 0.36]
   },
   EMPATES_PROMEDIO: 4.33,
@@ -17,14 +17,14 @@ const PROGOL_CONFIG = {
   EMPATES_MAX: 6,
   CONCENTRACION_MAX_GENERAL: 0.70,
   CONCENTRACION_MAX_INICIAL: 0.60,
-  
+
   // Calibración Bayesiana
   CALIBRACION: {
     k1_forma: 0.15,
     k2_lesiones: 0.10,
     k3_contexto: 0.20
   },
-  
+
   // Draw-Propensity Rule
   DRAW_PROPENSITY: {
     umbral_diferencia: 0.08,
@@ -52,7 +52,7 @@ class MatchClassifier {
     return partidos.map((partido, i) => {
       const partidoCalirado = this.aplicarCalibracionBayesiana(partido);
       const clasificacion = this.clasificarPartido(partidoCalirado);
-      
+
       return {
         id: i,
         local: partido.local,
@@ -67,26 +67,26 @@ class MatchClassifier {
 
   aplicarCalibracionBayesiana(partido: any) {
     const { k1_forma, k2_lesiones, k3_contexto } = PROGOL_CONFIG.CALIBRACION;
-    
+
     const deltaForma = partido.forma_diferencia || 0;
     const lesionesImpact = partido.lesiones_impact || 0;
     const contexto = partido.es_final ? 1.0 : 0.0;
-    
+
     const factorAjuste = 1 + k1_forma * deltaForma + k2_lesiones * lesionesImpact + k3_contexto * contexto;
-    
+
     let probLocal = partido.prob_local * factorAjuste;
     let probEmpate = partido.prob_empate;
     let probVisitante = partido.prob_visitante / Math.max(factorAjuste, 0.1);
-    
+
     // Aplicar Draw-Propensity Rule
     if (Math.abs(probLocal - probVisitante) < PROGOL_CONFIG.DRAW_PROPENSITY.umbral_diferencia &&
         probEmpate > Math.max(probLocal, probVisitante)) {
       probEmpate = Math.min(probEmpate + PROGOL_CONFIG.DRAW_PROPENSITY.boost_empate, 0.95);
     }
-    
+
     // Renormalizar
     const total = probLocal + probEmpate + probVisitante;
-    
+
     return {
       prob_local: probLocal / total,
       prob_empate: probEmpate / total,
@@ -97,9 +97,9 @@ class MatchClassifier {
   clasificarPartido(partido: any) {
     const probs = [partido.prob_local, partido.prob_empate, partido.prob_visitante];
     const maxProb = Math.max(...probs);
-    
+
     if (maxProb > this.umbralAncla) return 'Ancla';
-    if (partido.prob_empate > this.umbralEmpate && 
+    if (partido.prob_empate > this.umbralEmpate &&
         partido.prob_empate >= Math.max(partido.prob_local, partido.prob_visitante)) {
       return 'TendenciaEmpate';
     }
@@ -132,16 +132,16 @@ class PortfolioGenerator {
 
   generateCoreQuinielas(partidosClasificados: any[]) {
     const coreQuinielas = [];
-    
+
     for (let i = 0; i < 4; i++) {
       let quiniela = this.crearQuinielaBase(partidosClasificados);
-      
+
       if (i > 0) {
         quiniela = this.aplicarVariacion(quiniela, partidosClasificados, i);
       }
-      
+
       quiniela = this.ajustarEmpates(quiniela, partidosClasificados);
-      
+
       const quinielaObj = {
         id: `Core-${i + 1}`,
         tipo: 'Core',
@@ -150,20 +150,20 @@ class PortfolioGenerator {
         prob_11_plus: this.calcularProb11Plus(quiniela, partidosClasificados),
         distribucion: this.calcularDistribucion(quiniela)
       };
-      
+
       coreQuinielas.push(quinielaObj);
     }
-    
+
     return coreQuinielas;
   }
 
   crearQuinielaBase(partidosClasificados: any[]) {
     const quiniela: string[] = [];
     let empatesActuales = 0;
-    
+
     for (const partido of partidosClasificados) {
       let resultado;
-      
+
       if (partido.clasificacion === 'Ancla') {
         resultado = partido.resultadoSugerido;
       } else if (partido.clasificacion === 'TendenciaEmpate' && empatesActuales < PROGOL_CONFIG.EMPATES_MAX) {
@@ -172,22 +172,22 @@ class PortfolioGenerator {
       } else {
         resultado = partido.resultadoSugerido;
       }
-      
+
       if (resultado === 'E') empatesActuales++;
       quiniela.push(resultado);
     }
-    
+
     return quiniela;
   }
 
   generateSatelliteQuinielas(partidosClasificados: any[], quinielasCore: any[], numSatelites: number) {
     const satelites: any[] = [];
     const numPares = Math.floor(numSatelites / 2);
-    
+
     const partidosDivisor = partidosClasificados
       .map((p, i) => ({ ...p, index: i }))
       .filter(p => p.clasificacion === 'Divisor');
-    
+
     for (let par = 0; par < numPares; par++) {
       const [satA, satB] = this.crearParSatelites(
         partidosClasificados,
@@ -196,25 +196,25 @@ class PortfolioGenerator {
       );
       satelites.push(satA, satB);
     }
-    
+
     // Si número impar, crear uno adicional
     if (numSatelites % 2 === 1) {
       const satExtra = this.crearSateliteIndividual(partidosClasificados, satelites.length);
       satelites.push(satExtra);
     }
-    
+
     return satelites;
   }
 
   crearParSatelites(partidosClasificados: any[], partidosDivisor: any[], parId: number) {
     const partidoPrincipal = partidosDivisor[parId % partidosDivisor.length]?.index || 0;
-    
+
     const quinielaA: string[] = [];
     const quinielaB: string[] = [];
-    
+
     for (let i = 0; i < partidosClasificados.length; i++) {
       const partido = partidosClasificados[i];
-      
+
       if (i === partidoPrincipal) {
         // Anticorrelación en este partido
         quinielaA.push(partido.resultadoSugerido);
@@ -235,34 +235,34 @@ class PortfolioGenerator {
         }
       }
     }
-    
+
     const satA: any = {
       id: `Sat-${parId * 2 + 1}A`,
       tipo: 'Satelite',
       resultados: this.ajustarEmpates(quinielaA, partidosClasificados),
       par_id: parId
     };
-    
+
     const satB: any = {
       id: `Sat-${parId * 2 + 1}B`,
-      tipo: 'Satelite', 
+      tipo: 'Satelite',
       resultados: this.ajustarEmpates(quinielaB, partidosClasificados),
       par_id: parId
     };
-    
+
     // Calcular métricas
     [satA, satB].forEach(sat => {
       sat.empates = sat.resultados.filter((r: string) => r === 'E').length;
       sat.prob_11_plus = this.calcularProb11Plus(sat.resultados, partidosClasificados);
       sat.distribucion = this.calcularDistribucion(sat.resultados);
     });
-    
+
     return [satA, satB];
   }
 
   crearSateliteIndividual(partidosClasificados: any[], sateliteId: number) {
     let quiniela = this.crearQuinielaBase(partidosClasificados);
-    
+
     // Aplicar variación aleatoria
     for (let i = 0; i < partidosClasificados.length; i++) {
       const partido = partidosClasificados[i];
@@ -270,9 +270,9 @@ class PortfolioGenerator {
         quiniela[i] = this.getResultadoAlternativo(partido);
       }
     }
-    
+
     quiniela = this.ajustarEmpates(quiniela, partidosClasificados);
-    
+
     return {
       id: `Sat-${sateliteId + 1}`,
       tipo: 'Satelite',
@@ -290,7 +290,7 @@ class PortfolioGenerator {
       { resultado: 'E', prob: partido.prob_empate },
       { resultado: 'V', prob: partido.prob_visitante }
     ];
-    
+
     probs.sort((a, b) => b.prob - a.prob);
     return probs[1].resultado; // Segunda opción más probable
   }
@@ -298,20 +298,20 @@ class PortfolioGenerator {
   ajustarEmpates(quiniela: any[], partidosClasificados: any[]) {
     const empatesActuales = quiniela.filter(r => r === 'E').length;
     const quinielaAjustada = [...quiniela];
-    
+
     if (empatesActuales < PROGOL_CONFIG.EMPATES_MIN) {
       // Necesitamos más empates
       const empatesNecesarios = PROGOL_CONFIG.EMPATES_MIN - empatesActuales;
       const candidatos: any[] = [];
-      
+
       for (let i = 0; i < quinielaAjustada.length; i++) {
         if (quinielaAjustada[i] !== 'E' && partidosClasificados[i].prob_empate > 0.20) {
           candidatos.push({ index: i, prob: partidosClasificados[i].prob_empate });
         }
       }
-      
+
       candidatos.sort((a, b) => b.prob - a.prob);
-      
+
       for (let i = 0; i < Math.min(empatesNecesarios, candidatos.length); i++) {
         quinielaAjustada[candidatos[i].index] = 'E';
       }
@@ -319,41 +319,41 @@ class PortfolioGenerator {
       // Demasiados empates
       const empatesExceso = empatesActuales - PROGOL_CONFIG.EMPATES_MAX;
       const candidatosEmpate: any[] = [];
-      
+
       for (let i = 0; i < quinielaAjustada.length; i++) {
         if (quinielaAjustada[i] === 'E') {
           candidatosEmpate.push({ index: i, prob: partidosClasificados[i].prob_empate });
         }
       }
-      
+
       candidatosEmpate.sort((a, b) => a.prob - b.prob);
-      
+
       for (let i = 0; i < Math.min(empatesExceso, candidatosEmpate.length); i++) {
         const idx = candidatosEmpate[i].index;
         quinielaAjustada[idx] = partidosClasificados[idx].resultadoSugerido;
       }
     }
-    
+
     return quinielaAjustada;
   }
 
   aplicarVariacion(quiniela: any[], partidosClasificados: any[], variacion: number) {
     const quinielaVariada = [...quiniela];
     const candidatos: number[] = [];
-    
+
     for (let i = 0; i < partidosClasificados.length; i++) {
       if (partidosClasificados[i].clasificacion !== 'Ancla') {
         candidatos.push(i);
       }
     }
-    
+
     const numCambios = Math.min(2 + variacion, candidatos.length);
     const indicesCambio = this.shuffleArray(candidatos).slice(0, numCambios);
-    
+
     for (const idx of indicesCambio) {
       quinielaVariada[idx] = this.getResultadoAlternativo(partidosClasificados[idx]);
     }
-    
+
     return quinielaVariada;
   }
 
@@ -370,25 +370,25 @@ class PortfolioGenerator {
     // Aproximación Monte Carlo simplificada
     const numSimulaciones = 1000;
     let aciertos11Plus = 0;
-    
+
     for (let sim = 0; sim < numSimulaciones; sim++) {
       let aciertos = 0;
-      
+
       for (let i = 0; i < quiniela.length; i++) {
         const partido = partidosClasificados[i];
         const resultado = quiniela[i];
         let prob;
-        
+
         if (resultado === 'L') prob = partido.prob_local;
         else if (resultado === 'E') prob = partido.prob_empate;
         else prob = partido.prob_visitante;
-        
+
         if (Math.random() < prob) aciertos++;
       }
-      
+
       if (aciertos >= 11) aciertos11Plus++;
     }
-    
+
     return aciertos11Plus / numSimulaciones;
   }
 
@@ -522,12 +522,12 @@ class PortfolioValidator {
       }
 
       const maxConcentracion = Math.max(...Object.values(conteos)) / numQuinielas;
-      const limiteAplicable = partidoIdx < 3 ? 
-        PROGOL_CONFIG.CONCENTRACION_MAX_INICIAL : 
+      const limiteAplicable = partidoIdx < 3 ?
+        PROGOL_CONFIG.CONCENTRACION_MAX_INICIAL :
         PROGOL_CONFIG.CONCENTRACION_MAX_GENERAL;
 
       if (maxConcentracion > limiteAplicable) {
-        const resultadoConcentrado = Object.keys(conteos).reduce((a, b) => 
+        const resultadoConcentrado = Object.keys(conteos).reduce((a, b) =>
           conteos[a] > conteos[b] ? a : b
         );
         concentracionesProblematicas.push(
@@ -549,7 +549,7 @@ class PortfolioValidator {
     if (quinielas.length === 0) return;
 
     const probs11Plus = quinielas.map(q => q.prob_11_plus || 0);
-    
+
     validacion.metricas.prob_11_plus_promedio = probs11Plus.reduce((a, b) => a + b, 0) / probs11Plus.length;
     validacion.metricas.prob_11_plus_max = Math.max(...probs11Plus);
     validacion.metricas.prob_11_plus_min = Math.min(...probs11Plus);
@@ -631,7 +631,7 @@ export default function Home() {
   const [quinielasSatelites, setQuinielasSatelites] = useState<any[]>([]);
   const [quinielasFinales, setQuinielasFinales] = useState<any[]>([]);
   const [validacion, setValidacion] = useState<any>(null);
-  
+
   // Estados de UI
   const [activeTab, setActiveTab] = useState('datos');
   const [loading, setLoading] = useState(false);
@@ -754,7 +754,7 @@ export default function Home() {
       const todasQuinielas = [...quinielasCore, ...quinielasSatelites];
       const validator = new PortfolioValidator();
       const resultadoValidacion = validator.validatePortfolio(todasQuinielas);
-      
+
       setQuinielasFinales(todasQuinielas);
       setValidacion(resultadoValidacion);
     } catch (error) {
@@ -772,13 +772,13 @@ export default function Home() {
         const csv = e.target!.result as string;
         const lines = csv.split('\n').filter(line => line.trim() && !line.startsWith('#'));
         const headers = lines[0].split(',').map(h => h.trim());
-        
+
         const partidos = [];
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',').map(v => v.trim());
           if (values.length >= 5) {
             const probTotal = parseFloat(values[2]) + parseFloat(values[3]) + parseFloat(values[4]);
-            
+
             partidos.push({
               local: values[0],
               visitante: values[1],
@@ -791,7 +791,7 @@ export default function Home() {
             });
           }
         }
-        
+
         if (tipo === 'regular') {
           setPartidosRegular(partidos.slice(0, 14));
         } else {
@@ -818,7 +818,7 @@ export default function Home() {
             {Object.values(progress).filter(Boolean).length}/5 completados
           </span>
         </div>
-        
+
         <div className="grid grid-cols-5 gap-2">
           {[
             { key: 'datos', label: 'Datos', icon: Database },
@@ -861,36 +861,36 @@ export default function Home() {
               <div className="text-2xl font-bold text-blue-600">{partidosRegular.length}/14</div>
               <div className="text-sm text-gray-600">Partidos Regulares</div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                <div 
+                <div
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${Math.min(partidosRegular.length / 14 * 100, 100)}%` }}
                 />
               </div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{partidosRevancha.length}/7</div>
               <div className="text-sm text-gray-600">Partidos Revancha</div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                <div 
+                <div
                   className="bg-green-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${Math.min(partidosRevancha.length / 7 * 100, 100)}%` }}
                 />
               </div>
             </div>
-            
+
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">{(partidosRegular.length + partidosRevancha.length)}/21</div>
               <div className="text-sm text-gray-600">Total Progreso</div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                <div 
+                <div
                   className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${Math.min((partidosRegular.length + partidosRevancha.length) / 21 * 100, 100)}%` }}
                 />
               </div>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap gap-4">
             <button
               onClick={cargarDatosMuestra}
@@ -899,7 +899,7 @@ export default function Home() {
               <Bot className="w-4 h-4" />
               Cargar Datos de Muestra
             </button>
-            
+
             <label className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer">
               <Upload className="w-4 h-4" />
               Cargar CSV Regular
@@ -910,7 +910,7 @@ export default function Home() {
                 onChange={(e) => e.target.files && e.target.files[0] && procesarArchivoCSV(e.target.files[0], 'regular')}
               />
             </label>
-            
+
             <label className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors cursor-pointer">
               <Upload className="w-4 h-4" />
               Cargar CSV Revancha
@@ -1099,7 +1099,7 @@ export default function Home() {
                   'TendenciaEmpate': 'text-blue-600',
                   'Neutro': 'text-gray-600'
                 }[tipo];
-                
+
                 return (
                   <div key={tipo} className="text-center">
                     <div className={`text-lg font-bold ${color}`}>{count}</div>
@@ -1108,7 +1108,7 @@ export default function Home() {
                 );
               })}
             </div>
-            
+
             <div className="space-y-1 max-h-32 overflow-y-auto text-sm">
               {partidosClasificados.map((partido, i) => (
                 <div key={i} className="flex justify-between items-center">
@@ -1159,7 +1159,7 @@ export default function Home() {
       </div>
     </div>
   );
-  
+
   // NUEVO COMPONENTE DE RENDERIZADO PARA LA CONFIGURACIÓN
   const renderConfiguracion = () => (
     <Card>
@@ -1179,27 +1179,27 @@ export default function Home() {
             <label className="font-medium text-sm">Número Total de Quinielas</label>
             <span className="text-sm px-2 py-1 bg-gray-100 rounded-md font-mono">{config.numQuinielas}</span>
           </div>
-          <input 
-            type="range" 
-            min="5" 
-            max="40" 
+          <input
+            type="range"
+            min="5"
+            max="40"
             step="1"
             value={config.numQuinielas}
             onChange={(e) => setConfig(prev => ({ ...prev, numQuinielas: parseInt(e.target.value) }))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
           />
         </div>
-        
+
         {/* Fila para Simulaciones Montecarlo */}
         <div className="grid gap-2">
           <div className="flex justify-between items-center">
             <label className="font-medium text-sm">Simulaciones Montecarlo</label>
             <span className="text-sm px-2 py-1 bg-gray-100 rounded-md font-mono">{optimizerConfig.simulacionesMontecarlo}</span>
           </div>
-          <input 
-            type="range" 
-            min="1000" 
-            max="20000" 
+          <input
+            type="range"
+            min="1000"
+            max="20000"
             step="1000"
             value={optimizerConfig.simulacionesMontecarlo}
             onChange={(e) => setOptimizerConfig(prev => ({ ...prev, simulacionesMontecarlo: parseInt(e.target.value) }))}
@@ -1207,7 +1207,7 @@ export default function Home() {
           />
           <p className="text-xs text-gray-500">Define la precisión para calcular Pr[≥11]. Más es mejor pero más lento.</p>
         </div>
-        
+
         {/* Los siguientes parámetros son para un futuro optimizador GRASP, pero los dejamos listos */}
         <div className="grid gap-2 opacity-50 cursor-not-allowed">
            <div className="flex justify-between items-center">
@@ -1260,7 +1260,7 @@ export default function Home() {
               <div className="text-sm text-gray-600">Total Quinielas</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4 text-center">
               <div className="text-2xl font-bold text-green-600">{empatesPromedio.toFixed(1)}</div>
@@ -1268,14 +1268,14 @@ export default function Home() {
               <div className="text-xs text-gray-500">Target: {PROGOL_CONFIG.EMPATES_PROMEDIO}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4 text-center">
               <div className="text-2xl font-bold text-purple-600">{(prob11Plus * 100).toFixed(1)}%</div>
               <div className="text-sm text-gray-600">Pr[≥11] Promedio</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4 text-center">
               <div className="text-2xl font-bold text-orange-600">{(probPortafolio * 100).toFixed(1)}%</div>
@@ -1296,7 +1296,7 @@ export default function Home() {
                 const target = (PROGOL_CONFIG.DISTRIBUCION_HISTORICA as any)[resultado];
                 const [min, max] = (PROGOL_CONFIG.RANGOS_HISTORICOS as any)[resultado];
                 const enRango = actual >= min && actual <= max;
-                
+
                 return (
                   <div key={resultado} className="text-center">
                     <div className={`text-lg font-bold ${enRango ? 'text-green-600' : 'text-red-600'}`}>
@@ -1336,7 +1336,7 @@ export default function Home() {
                 <div className={`font-medium ${validacion.es_valido ? 'text-green-700' : 'text-yellow-700'}`}>
                   {validacion.es_valido ? '✅ Portafolio válido' : '⚠️ Portafolio con advertencias'}
                 </div>
-                
+
                 {validacion.warnings.length > 0 && (
                   <div className="mt-2">
                     <div className="text-sm font-medium text-yellow-700 mb-1">Advertencias:</div>
@@ -1350,7 +1350,7 @@ export default function Home() {
                     </ul>
                   </div>
                 )}
-                
+
                 {validacion.errores.length > 0 && (
                   <div className="mt-2">
                     <div className="text-sm font-medium text-red-700 mb-1">Errores:</div>
@@ -1408,7 +1408,7 @@ export default function Home() {
                   ))}
                 </tbody>
               </table>
-              
+
               {quinielasFinales.length > 10 && (
                 <div className="text-center p-4 text-gray-500 text-sm">
                   Mostrando las primeras 10 de {quinielasFinales.length} quinielas
@@ -1443,7 +1443,7 @@ export default function Home() {
         q.empates,
         ((q.prob_11_plus || 0) * 100).toFixed(2)
       ]);
-      
+
       const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
@@ -1466,7 +1466,7 @@ export default function Home() {
         quinielas: quinielasFinales,
         validacion: validacion
       };
-      
+
       const jsonContent = JSON.stringify(exportData, null, 2);
       const blob = new Blob([jsonContent], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1480,7 +1480,7 @@ export default function Home() {
     const generarProgol = () => {
       const lines = [
         'PROGOL OPTIMIZER - QUINIELAS GENERADAS',
-        '=' * 50,
+        '='.repeat(50),
         `Fecha: ${new Date().toLocaleString()}`,
         `Total de quinielas: ${quinielasFinales.length}`,
         `Metodología: Core + Satélites GRASP-Annealing`,
@@ -1495,7 +1495,7 @@ export default function Home() {
           return `Q-${String(i+1).padStart(2)} (${q.tipo.padStart(8)}): ${resultados} | E:${q.empates} | Pr:${prob}%`;
         })
       ];
-      
+
       const content = lines.join('\n');
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
@@ -1527,7 +1527,7 @@ export default function Home() {
                 <FileDown className="w-4 h-4" />
                 Descargar CSV
               </button>
-              
+
               <button
                 onClick={generarJSON}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1535,7 +1535,7 @@ export default function Home() {
                 <FileDown className="w-4 h-4" />
                 Descargar JSON
               </button>
-              
+
               <button
                 onClick={generarProgol}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -1557,24 +1557,24 @@ export default function Home() {
                 <div className="text-2xl font-bold text-blue-600">{quinielasFinales.length}</div>
                 <div className="text-sm text-gray-600">Total Quinielas</div>
               </div>
-              
+
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
                   {quinielasFinales.reduce((acc, q) => acc + q.empates, 0)}
                 </div>
                 <div className="text-sm text-gray-600">Total Empates</div>
               </div>
-              
+
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
                   ${quinielasFinales.length * 15}
                 </div>
                 <div className="text-sm text-gray-600">Costo Total (MXN)</div>
               </div>
-              
+
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
-                  {validacion?.metricas?.prob_portafolio_11_plus ? 
+                  {validacion?.metricas?.prob_portafolio_11_plus ?
                     (validacion.metricas.prob_portafolio_11_plus * 100).toFixed(1) : '0.0'}%
                 </div>
                 <div className="text-sm text-gray-600">Pr[≥11] Final</div>
@@ -1601,11 +1601,11 @@ export default function Home() {
               </h1>
               <p className="text-gray-600">Metodología Definitiva Core + Satélites</p>
             </div>
-            
+
             <div className="flex items-center gap-4 text-sm">
               <span className="text-gray-500">v1.0.0</span>
               <div className={`px-2 py-1 rounded text-xs ${
-                Object.values(progress).filter(Boolean).length >= 3 ? 
+                Object.values(progress).filter(Boolean).length >= 3 ?
                 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
               }`}>
                 {Object.values(progress).filter(Boolean).length}/5 pasos
@@ -1618,7 +1618,7 @@ export default function Home() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {renderBarraProgreso()}
-        
+
         {/* Navigation Tabs */}
         <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg overflow-x-auto">
           {[
