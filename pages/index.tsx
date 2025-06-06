@@ -35,12 +35,11 @@ const PROGOL_CONFIG = {
 // ==================== UTILIDADES PRINCIPALES ====================
 
 class MatchClassifier {
-  // ===== LÍNEAS AÑADIDAS =====
+  // Propiedades de la clase declaradas
   umbralAncla: number;
   umbralDivisorMin: number;
   umbralDivisorMax: number;
   umbralEmpate: number;
-  // ===========================
 
   constructor() {
     this.umbralAncla = 0.60;
@@ -49,7 +48,7 @@ class MatchClassifier {
     this.umbralEmpate = 0.30;
   }
 
-  classifyMatches(partidos) {
+  classifyMatches(partidos: any[]) {
     return partidos.map((partido, i) => {
       const partidoCalirado = this.aplicarCalibracionBayesiana(partido);
       const clasificacion = this.clasificarPartido(partidoCalirado);
@@ -66,7 +65,7 @@ class MatchClassifier {
     });
   }
 
-  aplicarCalibracionBayesiana(partido) {
+  aplicarCalibracionBayesiana(partido: any) {
     const { k1_forma, k2_lesiones, k3_contexto } = PROGOL_CONFIG.CALIBRACION;
     
     const deltaForma = partido.forma_diferencia || 0;
@@ -95,7 +94,7 @@ class MatchClassifier {
     };
   }
 
-  clasificarPartido(partido) {
+  clasificarPartido(partido: any) {
     const probs = [partido.prob_local, partido.prob_empate, partido.prob_visitante];
     const maxProb = Math.max(...probs);
     
@@ -108,8 +107,8 @@ class MatchClassifier {
     return 'Neutro';
   }
 
-  getResultadoSugerido(partido) {
-    const probs = {
+  getResultadoSugerido(partido: any) {
+    const probs: { [key: string]: number } = {
       L: partido.prob_local,
       E: partido.prob_empate,
       V: partido.prob_visitante
@@ -117,7 +116,7 @@ class MatchClassifier {
     return Object.keys(probs).reduce((a, b) => probs[a] > probs[b] ? a : b);
   }
 
-  calcularConfianza(partido) {
+  calcularConfianza(partido: any) {
     const probs = [partido.prob_local, partido.prob_empate, partido.prob_visitante];
     probs.sort((a, b) => b - a);
     return probs[0] - probs[1];
@@ -125,15 +124,13 @@ class MatchClassifier {
 }
 
 class PortfolioGenerator {
-  // ===== LÍNEA AÑADIDA =====
   seed: number;
-  // =========================
 
   constructor(seed = 42) {
     this.seed = seed;
   }
 
-  generateCoreQuinielas(partidosClasificados) {
+  generateCoreQuinielas(partidosClasificados: any[]) {
     const coreQuinielas = [];
     
     for (let i = 0; i < 4; i++) {
@@ -160,8 +157,8 @@ class PortfolioGenerator {
     return coreQuinielas;
   }
 
-  crearQuinielaBase(partidosClasificados) {
-    const quiniela = [];
+  crearQuinielaBase(partidosClasificados: any[]) {
+    const quiniela: string[] = [];
     let empatesActuales = 0;
     
     for (const partido of partidosClasificados) {
@@ -183,8 +180,8 @@ class PortfolioGenerator {
     return quiniela;
   }
 
-  generateSatelliteQuinielas(partidosClasificados, quinielasCore, numSatelites) {
-    const satelites = [];
+  generateSatelliteQuinielas(partidosClasificados: any[], quinielasCore: any[], numSatelites: number) {
+    const satelites: any[] = [];
     const numPares = Math.floor(numSatelites / 2);
     
     const partidosDivisor = partidosClasificados
@@ -209,11 +206,11 @@ class PortfolioGenerator {
     return satelites;
   }
 
-  crearParSatelites(partidosClasificados, partidosDivisor, parId) {
+  crearParSatelites(partidosClasificados: any[], partidosDivisor: any[], parId: number) {
     const partidoPrincipal = partidosDivisor[parId % partidosDivisor.length]?.index || 0;
     
-    const quinielaA = [];
-    const quinielaB = [];
+    const quinielaA: string[] = [];
+    const quinielaB: string[] = [];
     
     for (let i = 0; i < partidosClasificados.length; i++) {
       const partido = partidosClasificados[i];
@@ -239,14 +236,14 @@ class PortfolioGenerator {
       }
     }
     
-    const satA = {
+    const satA: any = {
       id: `Sat-${parId * 2 + 1}A`,
       tipo: 'Satelite',
       resultados: this.ajustarEmpates(quinielaA, partidosClasificados),
       par_id: parId
     };
     
-    const satB = {
+    const satB: any = {
       id: `Sat-${parId * 2 + 1}B`,
       tipo: 'Satelite', 
       resultados: this.ajustarEmpates(quinielaB, partidosClasificados),
@@ -255,7 +252,7 @@ class PortfolioGenerator {
     
     // Calcular métricas
     [satA, satB].forEach(sat => {
-      sat.empates = sat.resultados.filter(r => r === 'E').length;
+      sat.empates = sat.resultados.filter((r: string) => r === 'E').length;
       sat.prob_11_plus = this.calcularProb11Plus(sat.resultados, partidosClasificados);
       sat.distribucion = this.calcularDistribucion(sat.resultados);
     });
@@ -263,7 +260,7 @@ class PortfolioGenerator {
     return [satA, satB];
   }
 
-  crearSateliteIndividual(partidosClasificados, sateliteId) {
+  crearSateliteIndividual(partidosClasificados: any[], sateliteId: number) {
     let quiniela = this.crearQuinielaBase(partidosClasificados);
     
     // Aplicar variación aleatoria
@@ -287,7 +284,7 @@ class PortfolioGenerator {
     };
   }
 
-  getResultadoAlternativo(partido) {
+  getResultadoAlternativo(partido: any) {
     const probs = [
       { resultado: 'L', prob: partido.prob_local },
       { resultado: 'E', prob: partido.prob_empate },
@@ -298,14 +295,14 @@ class PortfolioGenerator {
     return probs[1].resultado; // Segunda opción más probable
   }
 
-  ajustarEmpates(quiniela, partidosClasificados) {
+  ajustarEmpates(quiniela: any[], partidosClasificados: any[]) {
     const empatesActuales = quiniela.filter(r => r === 'E').length;
     const quinielaAjustada = [...quiniela];
     
     if (empatesActuales < PROGOL_CONFIG.EMPATES_MIN) {
       // Necesitamos más empates
       const empatesNecesarios = PROGOL_CONFIG.EMPATES_MIN - empatesActuales;
-      const candidatos = [];
+      const candidatos: any[] = [];
       
       for (let i = 0; i < quinielaAjustada.length; i++) {
         if (quinielaAjustada[i] !== 'E' && partidosClasificados[i].prob_empate > 0.20) {
@@ -321,7 +318,7 @@ class PortfolioGenerator {
     } else if (empatesActuales > PROGOL_CONFIG.EMPATES_MAX) {
       // Demasiados empates
       const empatesExceso = empatesActuales - PROGOL_CONFIG.EMPATES_MAX;
-      const candidatosEmpate = [];
+      const candidatosEmpate: any[] = [];
       
       for (let i = 0; i < quinielaAjustada.length; i++) {
         if (quinielaAjustada[i] === 'E') {
@@ -340,9 +337,9 @@ class PortfolioGenerator {
     return quinielaAjustada;
   }
 
-  aplicarVariacion(quiniela, partidosClasificados, variacion) {
+  aplicarVariacion(quiniela: any[], partidosClasificados: any[], variacion: number) {
     const quinielaVariada = [...quiniela];
-    const candidatos = [];
+    const candidatos: number[] = [];
     
     for (let i = 0; i < partidosClasificados.length; i++) {
       if (partidosClasificados[i].clasificacion !== 'Ancla') {
@@ -360,7 +357,7 @@ class PortfolioGenerator {
     return quinielaVariada;
   }
 
-  shuffleArray(array) {
+  shuffleArray(array: any[]) {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -369,7 +366,7 @@ class PortfolioGenerator {
     return shuffled;
   }
 
-  calcularProb11Plus(quiniela, partidosClasificados) {
+  calcularProb11Plus(quiniela: any[], partidosClasificados: any[]) {
     // Aproximación Monte Carlo simplificada
     const numSimulaciones = 1000;
     let aciertos11Plus = 0;
@@ -395,7 +392,7 @@ class PortfolioGenerator {
     return aciertos11Plus / numSimulaciones;
   }
 
-  calcularDistribucion(quiniela) {
+  calcularDistribucion(quiniela: any[]) {
     const total = quiniela.length;
     return {
       L: quiniela.filter(r => r === 'L').length / total,
@@ -406,8 +403,8 @@ class PortfolioGenerator {
 }
 
 class PortfolioValidator {
-  validatePortfolio(quinielas) {
-    const validacion = {
+  validatePortfolio(quinielas: any[]) {
+    const validacion: any = {
       es_valido: true,
       warnings: [],
       errores: [],
@@ -435,9 +432,9 @@ class PortfolioValidator {
     return validacion;
   }
 
-  validarDistribucionGlobal(quinielas, validacion) {
+  validarDistribucionGlobal(quinielas: any[], validacion: any) {
     const totalPredicciones = quinielas.length * 14;
-    const conteos = { L: 0, E: 0, V: 0 };
+    const conteos: { [key: string]: number } = { L: 0, E: 0, V: 0 };
 
     for (const quiniela of quinielas) {
       for (const resultado of quiniela.resultados) {
@@ -454,7 +451,7 @@ class PortfolioValidator {
     validacion.metricas.distribucion_global = distribucionGlobal;
 
     for (const [resultado, proporcion] of Object.entries(distribucionGlobal)) {
-      const [minVal, maxVal] = PROGOL_CONFIG.RANGOS_HISTORICOS[resultado];
+      const [minVal, maxVal] = (PROGOL_CONFIG.RANGOS_HISTORICOS as any)[resultado];
 
       if (proporcion < minVal) {
         const diferencia = minVal - proporcion;
@@ -482,12 +479,12 @@ class PortfolioValidator {
     }
   }
 
-  validarEmpatesIndividuales(quinielas, validacion) {
-    const empatesPorQuiniela = [];
-    const quinielasProblematicas = [];
+  validarEmpatesIndividuales(quinielas: any[], validacion: any) {
+    const empatesPorQuiniela: number[] = [];
+    const quinielasProblematicas: string[] = [];
 
     for (let i = 0; i < quinielas.length; i++) {
-      const empates = quinielas[i].resultados.filter(r => r === 'E').length;
+      const empates = quinielas[i].resultados.filter((r: string) => r === 'E').length;
       empatesPorQuiniela.push(empates);
 
       if (empates < PROGOL_CONFIG.EMPATES_MIN) {
@@ -509,14 +506,14 @@ class PortfolioValidator {
     }
   }
 
-  validarConcentracion(quinielas, validacion) {
+  validarConcentracion(quinielas: any[], validacion: any) {
     const numQuinielas = quinielas.length;
     if (numQuinielas === 0) return;
 
-    const concentracionesProblematicas = [];
+    const concentracionesProblematicas: string[] = [];
 
     for (let partidoIdx = 0; partidoIdx < 14; partidoIdx++) {
-      const conteos = { L: 0, E: 0, V: 0 };
+      const conteos: { [key: string]: number } = { L: 0, E: 0, V: 0 };
 
       for (const quiniela of quinielas) {
         if (partidoIdx < quiniela.resultados.length) {
@@ -548,7 +545,7 @@ class PortfolioValidator {
     }
   }
 
-  calcularMetricas(quinielas, validacion) {
+  calcularMetricas(quinielas: any[], validacion: any) {
     if (quinielas.length === 0) return;
 
     const probs11Plus = quinielas.map(q => q.prob_11_plus || 0);
@@ -597,7 +594,7 @@ const createSampleData = () => {
     ['Monterrey', 'Tigres']
   ];
 
-  const generatePartidos = (equipos, withFinals = false) => {
+  const generatePartidos = (equipos: any[], withFinals = false) => {
     return equipos.map(([local, visitante], i) => {
       const rand = Math.random();
       const probLocal = 0.25 + rand * 0.3;
@@ -625,15 +622,15 @@ const createSampleData = () => {
 
 // ==================== COMPONENTE PRINCIPAL ====================
 
-export default function ProgolOptimizerApp() {
+export default function Home() {
   // Estados principales
-  const [partidosRegular, setPartidosRegular] = useState([]);
-  const [partidosRevancha, setPartidosRevancha] = useState([]);
-  const [partidosClasificados, setPartidosClasificados] = useState([]);
-  const [quinielasCore, setQuinielasCore] = useState([]);
-  const [quinielasSatelites, setQuinielasSatelites] = useState([]);
-  const [quinielasFinales, setQuinielasFinales] = useState([]);
-  const [validacion, setValidacion] = useState(null);
+  const [partidosRegular, setPartidosRegular] = useState<any[]>([]);
+  const [partidosRevancha, setPartidosRevancha] = useState<any[]>([]);
+  const [partidosClasificados, setPartidosClasificados] = useState<any[]>([]);
+  const [quinielasCore, setQuinielasCore] = useState<any[]>([]);
+  const [quinielasSatelites, setQuinielasSatelites] = useState<any[]>([]);
+  const [quinielasFinales, setQuinielasFinales] = useState<any[]>([]);
+  const [validacion, setValidacion] = useState<any>(null);
   
   // Estados de UI
   const [activeTab, setActiveTab] = useState('datos');
@@ -768,11 +765,11 @@ export default function ProgolOptimizerApp() {
     }
   }, [quinielasCore, quinielasSatelites]);
 
-  const procesarArchivoCSV = useCallback((file, tipo) => {
+  const procesarArchivoCSV = useCallback((file: File, tipo: string) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const csv = e.target.result;
+        const csv = e.target!.result as string;
         const lines = csv.split('\n').filter(line => line.trim() && !line.startsWith('#'));
         const headers = lines[0].split(',').map(h => h.trim());
         
@@ -832,11 +829,11 @@ export default function ProgolOptimizerApp() {
           ].map(({ key, label, icon: Icon }) => (
             <div key={key} className="text-center">
               <div className={`mx-auto w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
-                progress[key] ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                (progress as any)[key] ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
               }`}>
                 <Icon className="w-4 h-4" />
               </div>
-              <span className={`text-xs ${progress[key] ? 'text-green-600' : 'text-gray-400'}`}>
+              <span className={`text-xs ${(progress as any)[key] ? 'text-green-600' : 'text-gray-400'}`}>
                 {label}
               </span>
             </div>
@@ -910,7 +907,7 @@ export default function ProgolOptimizerApp() {
                 type="file"
                 accept=".csv"
                 className="hidden"
-                onChange={(e) => e.target.files[0] && procesarArchivoCSV(e.target.files[0], 'regular')}
+                onChange={(e) => e.target.files && e.target.files[0] && procesarArchivoCSV(e.target.files[0], 'regular')}
               />
             </label>
             
@@ -921,7 +918,7 @@ export default function ProgolOptimizerApp() {
                 type="file"
                 accept=".csv"
                 className="hidden"
-                onChange={(e) => e.target.files[0] && procesarArchivoCSV(e.target.files[0], 'revancha')}
+                onChange={(e) => e.target.files && e.target.files[0] && procesarArchivoCSV(e.target.files[0], 'revancha')}
               />
             </label>
           </div>
@@ -1237,15 +1234,15 @@ export default function ProgolOptimizerApp() {
       );
     }
 
-    const empatesPromedio = quinielasFinales.reduce((acc, q) => acc + q.resultados.filter(r => r === 'E').length, 0) / quinielasFinales.length;
+    const empatesPromedio = quinielasFinales.reduce((acc, q) => acc + q.resultados.filter((r:string) => r === 'E').length, 0) / quinielasFinales.length;
     const prob11Plus = quinielasFinales.reduce((acc, q) => acc + (q.prob_11_plus || 0), 0) / quinielasFinales.length;
     const probPortafolio = validacion?.metricas?.prob_portafolio_11_plus || 0;
 
     // Calcular distribución
     const totalPredicciones = quinielasFinales.length * 14;
-    const conteos = { L: 0, E: 0, V: 0 };
+    const conteos: { [key: string]: number } = { L: 0, E: 0, V: 0 };
     quinielasFinales.forEach(q => {
-      q.resultados.forEach(r => conteos[r]++);
+      q.resultados.forEach((r: string) => conteos[r]++);
     });
     const distribucion = {
       L: conteos.L / totalPredicciones,
@@ -1295,9 +1292,9 @@ export default function ProgolOptimizerApp() {
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               {['L', 'E', 'V'].map(resultado => {
-                const actual = distribucion[resultado];
-                const target = PROGOL_CONFIG.DISTRIBUCION_HISTORICA[resultado];
-                const [min, max] = PROGOL_CONFIG.RANGOS_HISTORICOS[resultado];
+                const actual = (distribucion as any)[resultado];
+                const target = (PROGOL_CONFIG.DISTRIBUCION_HISTORICA as any)[resultado];
+                const [min, max] = (PROGOL_CONFIG.RANGOS_HISTORICOS as any)[resultado];
                 const enRango = actual >= min && actual <= max;
                 
                 return (
@@ -1344,7 +1341,7 @@ export default function ProgolOptimizerApp() {
                   <div className="mt-2">
                     <div className="text-sm font-medium text-yellow-700 mb-1">Advertencias:</div>
                     <ul className="text-sm text-yellow-600 space-y-1">
-                      {validacion.warnings.slice(0, 3).map((warning, i) => (
+                      {validacion.warnings.slice(0, 3).map((warning: string, i: number) => (
                         <li key={i}>• {warning}</li>
                       ))}
                       {validacion.warnings.length > 3 && (
@@ -1358,7 +1355,7 @@ export default function ProgolOptimizerApp() {
                   <div className="mt-2">
                     <div className="text-sm font-medium text-red-700 mb-1">Errores:</div>
                     <ul className="text-sm text-red-600 space-y-1">
-                      {validacion.errores.map((error, i) => (
+                      {validacion.errores.map((error: string, i: number) => (
                         <li key={i}>• {error}</li>
                       ))}
                     </ul>
@@ -1397,7 +1394,7 @@ export default function ProgolOptimizerApp() {
                       }`}>
                         {quiniela.tipo}
                       </td>
-                      {quiniela.resultados.map((resultado, j) => (
+                      {quiniela.resultados.map((resultado: string, j: number) => (
                         <td key={j} className={`text-center p-1 font-mono ${
                           resultado === 'L' ? 'text-blue-600' :
                           resultado === 'E' ? 'text-gray-600' : 'text-red-600'
