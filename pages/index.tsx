@@ -35,6 +35,13 @@ const PROGOL_CONFIG = {
 // ==================== UTILIDADES PRINCIPALES ====================
 
 class MatchClassifier {
+  // ===== LÍNEAS AÑADIDAS =====
+  umbralAncla: number;
+  umbralDivisorMin: number;
+  umbralDivisorMax: number;
+  umbralEmpate: number;
+  // ===========================
+
   constructor() {
     this.umbralAncla = 0.60;
     this.umbralDivisorMin = 0.40;
@@ -118,6 +125,10 @@ class MatchClassifier {
 }
 
 class PortfolioGenerator {
+  // ===== LÍNEA AÑADIDA =====
+  seed: number;
+  // =========================
+
   constructor(seed = 42) {
     this.seed = seed;
   }
