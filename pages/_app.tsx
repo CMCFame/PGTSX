@@ -1,4 +1,4 @@
-import '@/styles/globals.css'
+import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
 // Este componente es la plantilla principal de toda tu aplicación.
