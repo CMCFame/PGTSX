@@ -636,6 +636,14 @@ export default function ProgolOptimizerApp() {
     correlacionTarget: -0.35
   });
 
+  // NUEVO ESTADO PARA PARÁMETROS DE OPTIMIZACIÓN
+  const [optimizerConfig, setOptimizerConfig] = useState({
+    iteracionesOptimizador: 2000,
+    temperaturaInicial: 0.05,
+    tasaEnfriamiento: 0.92,
+    simulacionesMontecarlo: 1000,
+  });
+
   // Configuración del progreso
   const [progress, setProgress] = useState({
     datos: false,
@@ -1143,6 +1151,67 @@ export default function ProgolOptimizerApp() {
       </div>
     </div>
   );
+  
+  // NUEVO COMPONENTE DE RENDERIZADO PARA LA CONFIGURACIÓN
+  const renderConfiguracion = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Settings className="w-5 h-5" />
+          Parámetros de Optimización
+        </CardTitle>
+        <CardDescription>
+          Ajusta los hiperparámetros del algoritmo de generación. Cambios aquí requerirán volver a generar las quinielas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-8 pt-4">
+        {/* Fila para Número de Quinielas (existente) */}
+        <div className="grid gap-2">
+          <div className="flex justify-between items-center">
+            <label className="font-medium text-sm">Número Total de Quinielas</label>
+            <span className="text-sm px-2 py-1 bg-gray-100 rounded-md font-mono">{config.numQuinielas}</span>
+          </div>
+          <input 
+            type="range" 
+            min="5" 
+            max="40" 
+            step="1"
+            value={config.numQuinielas}
+            onChange={(e) => setConfig(prev => ({ ...prev, numQuinielas: parseInt(e.target.value) }))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+        
+        {/* Fila para Simulaciones Montecarlo */}
+        <div className="grid gap-2">
+          <div className="flex justify-between items-center">
+            <label className="font-medium text-sm">Simulaciones Montecarlo</label>
+            <span className="text-sm px-2 py-1 bg-gray-100 rounded-md font-mono">{optimizerConfig.simulacionesMontecarlo}</span>
+          </div>
+          <input 
+            type="range" 
+            min="1000" 
+            max="20000" 
+            step="1000"
+            value={optimizerConfig.simulacionesMontecarlo}
+            onChange={(e) => setOptimizerConfig(prev => ({ ...prev, simulacionesMontecarlo: parseInt(e.target.value) }))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+          <p className="text-xs text-gray-500">Define la precisión para calcular Pr[≥11]. Más es mejor pero más lento.</p>
+        </div>
+        
+        {/* Los siguientes parámetros son para un futuro optimizador GRASP, pero los dejamos listos */}
+        <div className="grid gap-2 opacity-50 cursor-not-allowed">
+           <div className="flex justify-between items-center">
+            <label className="font-medium text-sm">Iteraciones del Optimizador (futuro)</label>
+            <span className="text-sm px-2 py-1 bg-gray-100 rounded-md font-mono">{optimizerConfig.iteracionesOptimizador}</span>
+          </div>
+           <input type="range" disabled className="w-full h-2 bg-gray-200 rounded-lg appearance-none" />
+          <p className="text-xs text-gray-500">Para el optimizador GRASP-Annealing no implementado aún.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const renderResultados = () => {
     if (quinielasFinales.length === 0) {
@@ -1543,17 +1612,18 @@ export default function ProgolOptimizerApp() {
         {renderBarraProgreso()}
         
         {/* Navigation Tabs */}
-        <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+        <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg overflow-x-auto">
           {[
-            { id: 'datos', label: 'Entrada de Datos', icon: Database },
+            { id: 'datos', label: 'Datos', icon: Database },
             { id: 'generacion', label: 'Generación', icon: Zap },
+            { id: 'configuracion', label: 'Configuración', icon: Settings },
             { id: 'resultados', label: 'Resultados', icon: BarChart3 },
             { id: 'exportacion', label: 'Exportar', icon: FileDown }
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
                 activeTab === id
                   ? 'bg-white text-blue-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
@@ -1568,6 +1638,7 @@ export default function ProgolOptimizerApp() {
         {/* Tab Content */}
         {activeTab === 'datos' && renderEntradaDatos()}
         {activeTab === 'generacion' && renderGeneracion()}
+        {activeTab === 'configuracion' && renderConfiguracion()}
         {activeTab === 'resultados' && renderResultados()}
         {activeTab === 'exportacion' && renderExportacion()}
       </div>
